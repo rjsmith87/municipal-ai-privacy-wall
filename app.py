@@ -98,28 +98,64 @@ def detect_vehicles(image_bgr):
 
 
 def find_plates_in_vehicle(image_bgr, vehicle_bbox):
+    """Find license plate regions within a vehicle bounding box."""
     x1, y1, x2, y2 = vehicle_bbox
-    roi = image_bgr[y1:y2, x1:x2]
+    vh = y2 - y1
+    
+    # Plates are typically in bottom 40% of vehicle
+    plate_region_y1 = y1 + int(vh * 0.5)
+    roi = image_bgr[plate_region_y1:y2, x1:x2]
+    
     if roi.size == 0:
         return []
     
     gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
     filtered = cv2.bilateralFilter(gray, 11, 17, 17)
     edges = cv2.Canny(filtered, 30, 200)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    
+    # Dilate to connect edges
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    edges = cv2.dilate(edges, kernel, iterations=1)
+    
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     plates = []
     roi_h, roi_w = roi.shape[:2]
     
     for contour in contours:
-        approx = cv2.approxPolyDP(contour, 0.02 * cv2.arcLength(contour, True), True)
-        if 4 <= len(approx) <= 6:
-            x, y, w, h = cv2.boundingRect(contour)
-            aspect_ratio = w / h if h > 0 else 0
-            area = w * h
-            roi_area = roi_w * roi_h
-            if 2.0 < aspect_ratio < 6.0 and 0.005 < area / roi_area < 0.15:
-                plates.append((x1 + x, y1 + y, x1 + x + w, y1 + y + h))
+        # Get rotated rectangle for better aspect ratio calc
+        rect = cv2.minAreaRect(contour)
+        w, h = rect[1]
+        if w == 0 or h == 0:
+            continue
+        
+        # Ensure width > height for aspect ratio
+        if h > w:
+            w, h = h, w
+        
+        aspect_ratio = w / h
+        area = w * h
+        roi_area = roi_w * roi_h
+        
+        # License plates: aspect ratio 2-5, reasonable size
+        # Much tighter constraints than before
+        if not (2.0 < aspect_ratio < 5.0):
+            continue
+        if not (0.01 < area / roi_area < 0.08):
+            continue
+        
+        # Get bounding box
+        x, y, bw, bh = cv2.boundingRect(contour)
+        
+        # Additional check: plate should be roughly rectangular
+        rect_area = bw * bh
+        fill_ratio = area / rect_area if rect_area > 0 else 0
+        if fill_ratio < 0.5:
+            continue
+        
+        # Convert back to full image coordinates
+        plates.append((x1 + x, plate_region_y1 + y, x1 + x + bw, plate_region_y1 + y + bh))
+    
     return plates
 
 
