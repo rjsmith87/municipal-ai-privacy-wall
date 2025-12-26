@@ -22,17 +22,25 @@ mp_face = mp.solutions.face_detection
 face_detector = mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5)
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "yolov8n.onnx")
+PLATE_MODEL_PATH = os.path.join(os.path.dirname(__file__), "plate_detect.onnx")
 ort_session = None
+plate_session = None
 
-def load_yolo():
-    global ort_session
+def load_models():
+    global ort_session, plate_session
     if os.path.exists(MODEL_PATH):
         ort_session = ort.InferenceSession(MODEL_PATH, providers=["CPUExecutionProvider"])
-        print(f"✓ YOLOv8 ONNX model loaded from {MODEL_PATH}")
+        print(f"✓ YOLOv8 vehicle model loaded")
     else:
-        print(f"⚠ YOLOv8 model not found at {MODEL_PATH} - plate detection disabled")
+        print(f"⚠ Vehicle model not found at {MODEL_PATH}")
+    
+    if os.path.exists(PLATE_MODEL_PATH):
+        plate_session = ort.InferenceSession(PLATE_MODEL_PATH, providers=["CPUExecutionProvider"])
+        print(f"✓ License plate model loaded")
+    else:
+        print(f"⚠ Plate model not found at {PLATE_MODEL_PATH}")
 
-load_yolo()
+load_models()
 
 VEHICLE_CLASSES = {2, 3, 5, 7}  # car, motorcycle, bus, truck
 
@@ -97,64 +105,57 @@ def detect_vehicles(image_bgr):
     return postprocess_yolo(output[0], scale, pad_x, pad_y, h, w)
 
 
-def find_plates_in_vehicle(image_bgr, vehicle_bbox):
-    """Find license plate regions within a vehicle bounding box."""
-    x1, y1, x2, y2 = vehicle_bbox
-    vh = y2 - y1
-    
-    # Plates are typically in bottom 40% of vehicle
-    plate_region_y1 = y1 + int(vh * 0.5)
-    roi = image_bgr[plate_region_y1:y2, x1:x2]
-    
-    if roi.size == 0:
+def detect_plates(image_bgr):
+    """Detect license plates using dedicated plate detection model."""
+    if plate_session is None:
         return []
     
-    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-    filtered = cv2.bilateralFilter(gray, 11, 17, 17)
-    edges = cv2.Canny(filtered, 30, 200)
+    h, w = image_bgr.shape[:2]
     
-    # Dilate to connect edges
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    edges = cv2.dilate(edges, kernel, iterations=1)
+    # Preprocess
+    input_size = 640
+    scale = min(input_size / w, input_size / h)
+    new_w, new_h = int(w * scale), int(h * scale)
+    resized = cv2.resize(image_bgr, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+    padded = np.full((input_size, input_size, 3), 114, dtype=np.uint8)
+    pad_x, pad_y = (input_size - new_w) // 2, (input_size - new_h) // 2
+    padded[pad_y:pad_y + new_h, pad_x:pad_x + new_w] = resized
+    blob = padded[:, :, ::-1].transpose(2, 0, 1).astype(np.float32) / 255.0
+    blob = np.expand_dims(blob, axis=0)
     
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # Run inference
+    input_name = plate_session.get_inputs()[0].name
+    output = plate_session.run(None, {input_name: blob})[0]
     
+    # Postprocess - YOLOv11 output shape
     plates = []
-    roi_h, roi_w = roi.shape[:2]
+    predictions = output[0].transpose()
     
-    for contour in contours:
-        # Get rotated rectangle for better aspect ratio calc
-        rect = cv2.minAreaRect(contour)
-        w, h = rect[1]
-        if w == 0 or h == 0:
+    for pred in predictions:
+        x_c, y_c, pw, ph = pred[:4]
+        confidence = pred[4:].max() if len(pred) > 4 else pred[4] if len(pred) == 5 else 0
+        
+        if confidence < 0.4:
             continue
         
-        # Ensure width > height for aspect ratio
-        if h > w:
-            w, h = h, w
+        # Convert to original image coordinates
+        x1 = (x_c - pw / 2 - pad_x) / scale
+        y1 = (y_c - ph / 2 - pad_y) / scale
+        x2 = (x_c + pw / 2 - pad_x) / scale
+        y2 = (y_c + ph / 2 - pad_y) / scale
         
-        aspect_ratio = w / h
-        area = w * h
-        roi_area = roi_w * roi_h
+        x1, y1 = max(0, int(x1)), max(0, int(y1))
+        x2, y2 = min(w, int(x2)), min(h, int(y2))
         
-        # License plates: aspect ratio 2-5, reasonable size
-        # Much tighter constraints than before
-        if not (2.0 < aspect_ratio < 5.0):
-            continue
-        if not (0.01 < area / roi_area < 0.08):
-            continue
-        
-        # Get bounding box
-        x, y, bw, bh = cv2.boundingRect(contour)
-        
-        # Additional check: plate should be roughly rectangular
-        rect_area = bw * bh
-        fill_ratio = area / rect_area if rect_area > 0 else 0
-        if fill_ratio < 0.5:
-            continue
-        
-        # Convert back to full image coordinates
-        plates.append((x1 + x, plate_region_y1 + y, x1 + x + bw, plate_region_y1 + y + bh))
+        if x2 > x1 and y2 > y1:
+            plates.append((x1, y1, x2, y2))
+    
+    # NMS to remove duplicates
+    if len(plates) > 1:
+        boxes = [[p[0], p[1], p[2]-p[0], p[3]-p[1]] for p in plates]
+        scores = [1.0] * len(plates)
+        indices = cv2.dnn.NMSBoxes(boxes, scores, 0.4, 0.5)
+        plates = [plates[i[0] if isinstance(i, (list, np.ndarray)) else i] for i in indices]
     
     return plates
 
@@ -184,7 +185,7 @@ def apply_blur(image_bgr, regions, blur_strength=99):
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "models": {"mediapipe_face": True, "yolov8_onnx": ort_session is not None}})
+    return jsonify({"status": "ok", "models": {"mediapipe_face": True, "yolov8_onnx": ort_session is not None, "plate_detect": plate_session is not None}})
 
 
 @app.route("/redact", methods=["POST"])
@@ -200,10 +201,8 @@ def redact():
         image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
         
         faces = detect_faces(image_rgb)
-        plates = []
+        plates = detect_plates(image_bgr)
         vehicles = detect_vehicles(image_bgr)
-        for vehicle in vehicles:
-            plates.extend(find_plates_in_vehicle(image_bgr, vehicle["bbox"]))
         
         all_regions = faces + plates
         if all_regions:
