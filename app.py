@@ -15,7 +15,7 @@ from flask import Flask, jsonify, request
 from PIL import Image
 import mediapipe as mp
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", static_url_path="")
 
 # --- Model Loading ---
 mp_face = mp.solutions.face_detection
@@ -216,8 +216,8 @@ def redact():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/", methods=["GET"])
-def index():
+@app.route("/api/info", methods=["GET"])
+def api_info():
     return jsonify({"service": "Toronto 311 Image Redactor", "version": "2.0.0", "endpoints": {"/health": "GET - Health check", "/redact": "POST - Redact faces and plates from image"}})
 
 
@@ -279,3 +279,7 @@ def test_applink():
         "status": resp.status_code,
         "response": resp.json() if resp.status_code == 200 else resp.text
     })
+
+@app.route("/", methods=["GET"])
+def index():
+    return app.send_static_file('index.html')
