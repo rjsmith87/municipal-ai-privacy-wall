@@ -264,3 +264,18 @@ def chat():
             return jsonify({'success': False, 'error': f'Salesforce error: {response.status_code}'}), 500
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route("/test-applink", methods=["GET"])
+def test_applink():
+    """Test AppLink authorization"""
+    import requests
+    APPLINK_API_URL = os.environ.get('HEROKU_APPLINK_API_URL')
+    APPLINK_TOKEN = os.environ.get('HEROKU_APPLINK_TOKEN')
+    
+    url = f"{APPLINK_API_URL}/authorizations/toronto_auth"
+    headers = {"Authorization": f"Bearer {APPLINK_TOKEN}"}
+    resp = requests.get(url, headers=headers)
+    return jsonify({
+        "status": resp.status_code,
+        "response": resp.json() if resp.status_code == 200 else resp.text
+    })
