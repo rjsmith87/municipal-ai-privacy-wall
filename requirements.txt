@@ -6,3 +6,4 @@ pillow==10.0.1
 mediapipe==0.10.9
 onnxruntime==1.19.0
 requests==2.31.0
+PyJWT==2.8.0

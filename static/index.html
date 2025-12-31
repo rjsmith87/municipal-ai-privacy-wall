@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toronto 311 - Report an Issue</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; min-height: 100vh; }
+        .header { background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
+        .header img { height: 40px; }
+        .header h1 { font-size: 1.5rem; font-weight: 500; }
+        .container { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .card-header { background: #0066cc; color: white; padding: 1rem 1.5rem; font-size: 1.1rem; font-weight: 500; }
+        .card-body { padding: 1.5rem; }
+        .chat-container { height: 400px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; background: #fafafa; }
+        .message { margin-bottom: 1rem; display: flex; flex-direction: column; }
+        .message.user { align-items: flex-end; }
+        .message.agent { align-items: flex-start; }
+        .message-bubble { max-width: 80%; padding: 0.75rem 1rem; border-radius: 12px; }
+        .message.user .message-bubble { background: #0066cc; color: white; border-bottom-right-radius: 4px; }
+        .message.agent .message-bubble { background: #e8e8e8; color: #333; border-bottom-left-radius: 4px; }
+        .input-row { display: flex; gap: 0.5rem; }
+        .input-row input { flex: 1; padding: 0.75rem 1rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+        .input-row input:focus { outline: none; border-color: #0066cc; }
+        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
+        .btn-primary { background: #0066cc; color: white; }
+        .btn-primary:hover { background: #0052a3; }
+        .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+        .upload-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee; }
+        .upload-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: #f0f0f0; border: 1px dashed #999; border-radius: 8px; cursor: pointer; }
+        .upload-btn:hover { background: #e8e8e8; }
+        .preview { margin-top: 1rem; }
+        .preview img { max-width: 100%; max-height: 200px; border-radius: 8px; }
+        .status { font-size: 0.85rem; color: #666; margin-top: 0.5rem; }
+        .privacy-note { background: #e8f4e8; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin-top: 1rem; border-radius: 0 8px 8px 0; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏙️ Toronto 311 - Report an Issue</h1>
+    </div>
+    
+    <div class="container">
+        <div class="card">
+            <div class="card-header">Chat with Austin - Your 311 Service Agent</div>
+            <div class="card-body">
+                <div class="chat-container" id="chatContainer">
+                    <div class="message agent">
+                        <div class="message-bubble">Hello! I'm Austin, your Toronto 311 service agent. How can I help you today? You can describe an issue or upload a photo.</div>
+                    </div>
+                </div>
+                
+                <div class="input-row">
+                    <input type="text" id="messageInput" placeholder="Describe your issue..." onkeypress="if(event.key==='Enter')sendMessage()">
+                    <button class="btn btn-primary" onclick="sendMessage()" id="sendBtn">Send</button>
+                </div>
+                
+                <div class="upload-section">
+                    <label class="upload-btn">
+                        📷 Attach Photo
+                        <input type="file" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+                    </label>
+                    <span class="status" id="uploadStatus"></span>
+                    <div class="preview" id="preview"></div>
+                </div>
+                
+                <div class="privacy-note">
+                    🔒 <strong>Privacy Protected:</strong> All uploaded images are automatically processed to blur faces and license plates before analysis.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = null;
+        let pendingImage = null;
+
+        function addMessage(text, isUser) {
+            const container = document.getElementById('chatContainer');
+            const div = document.createElement('div');
+            div.className = `message ${isUser ? 'user' : 'agent'}`;
+            div.innerHTML = `<div class="message-bubble">${text}</div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message && !pendingImage) return;
+
+            const btn = document.getElementById('sendBtn');
+            btn.disabled = true;
+
+            if (message) {
+                addMessage(message, true);
+                input.value = '';
+            }
+
+            try {
+                // If there's a pending image, include note about it
+                let fullMessage = message;
+                if (pendingImage) {
+                    fullMessage = message || 'I\'m uploading a photo of the issue.';
+                    addMessage('📷 Photo attached (privacy-redacted)', true);
+                }
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: fullMessage,
+                        sessionId: sessionId,
+                        imageBase64: pendingImage
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    sessionId = data.sessionId;
+                    addMessage(data.message, false);
+                } else {
+                    addMessage('Sorry, I encountered an error. Please try again.', false);
+                    console.error(data.error);
+                }
+            } catch (err) {
+                addMessage('Connection error. Please try again.', false);
+                console.error(err);
+            }
+
+            pendingImage = null;
+            document.getElementById('preview').innerHTML = '';
+            document.getElementById('uploadStatus').textContent = '';
+            btn.disabled = false;
+        }
+
+        async function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const status = document.getElementById('uploadStatus');
+            status.textContent = 'Processing image...';
+
+            try {
+                // Read file as base64
+                const base64 = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.readAsDataURL(file);
+                });
+
+                // Send to redaction endpoint
+                status.textContent = 'Applying privacy redaction...';
+                const response = await fetch('/redact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imageBase64: base64 })
+                });
+
+                const data = await response.json();
+                
+                if (data.redactedBase64) {
+                    pendingImage = data.redactedBase64;
+                    document.getElementById('preview').innerHTML = 
+                        `<img src="data:image/jpeg;base64,${data.redactedBase64}" alt="Redacted preview">`;
+                    
+                    let statusText = '✓ Image ready';
+                    if (data.facesBlurred > 0 || data.platesBlurred > 0) {
+                        statusText += ` (${data.facesBlurred} faces, ${data.platesBlurred} plates redacted)`;
+                    }
+                    status.textContent = statusText;
+                } else {
+                    status.textContent = 'Error processing image';
+                }
+            } catch (err) {
+                status.textContent = 'Error uploading image';
+                console.error(err);
+            }
+
+            event.target.value = '';
+        }
+    </script>
+</body>
+</html>

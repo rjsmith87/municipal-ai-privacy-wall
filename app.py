@@ -2,20 +2,71 @@
 Toronto 311 Image Redactor - Production Build
 Face detection: MediaPipe
 Vehicle/plate detection: YOLOv8 via ONNX Runtime
+Auth: JWT Bearer Flow
 """
 
 import base64
 import os
+import time
 from io import BytesIO
 
 import cv2
+import jwt
 import numpy as np
 import onnxruntime as ort
-from flask import Flask, jsonify, request
+import requests
+from flask import Flask, jsonify, request, send_from_directory
 from PIL import Image
 import mediapipe as mp
 
 app = Flask(__name__, static_folder="static", static_url_path="")
+
+# --- Salesforce JWT Auth ---
+SF_CONSUMER_KEY = os.environ.get('SF_CONSUMER_KEY')
+SF_USERNAME = os.environ.get('SF_USERNAME')
+SF_LOGIN_URL = os.environ.get('SF_LOGIN_URL', 'https://login.salesforce.com')
+SF_PRIVATE_KEY = os.environ.get('SF_PRIVATE_KEY', '').replace('\\n', '\n')
+
+_sf_token_cache = {'token': None, 'instance_url': None, 'expires_at': 0}
+
+def get_sf_access_token():
+    """Get Salesforce access token via JWT Bearer flow, with caching."""
+    global _sf_token_cache
+    
+    # Return cached token if still valid (with 5 min buffer)
+    if _sf_token_cache['token'] and time.time() < _sf_token_cache['expires_at'] - 300:
+        return _sf_token_cache['token'], _sf_token_cache['instance_url']
+    
+    # Build JWT
+    claim = {
+        'iss': SF_CONSUMER_KEY,
+        'sub': SF_USERNAME,
+        'aud': SF_LOGIN_URL,
+        'exp': int(time.time()) + 300
+    }
+    
+    assertion = jwt.encode(claim, SF_PRIVATE_KEY, algorithm='RS256')
+    
+    # Token endpoint
+    token_url = f"{SF_LOGIN_URL}/services/oauth2/token"
+    resp = requests.post(token_url, data={
+        'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        'assertion': assertion
+    })
+    
+    if resp.status_code != 200:
+        raise Exception(f"JWT auth failed: {resp.text}")
+    
+    data = resp.json()
+    _sf_token_cache = {
+        'token': data['access_token'],
+        'instance_url': data['instance_url'],
+        'expires_at': time.time() + 7200  # 2 hour cache
+    }
+    
+    print(f"✓ Got new Salesforce token")
+    return _sf_token_cache['token'], _sf_token_cache['instance_url']
+
 
 # --- Model Loading ---
 mp_face = mp.solutions.face_detection
@@ -106,13 +157,10 @@ def detect_vehicles(image_bgr):
 
 
 def detect_plates(image_bgr):
-    """Detect license plates using dedicated plate detection model."""
     if plate_session is None:
         return []
     
     h, w = image_bgr.shape[:2]
-    
-    # Preprocess
     input_size = 640
     scale = min(input_size / w, input_size / h)
     new_w, new_h = int(w * scale), int(h * scale)
@@ -123,11 +171,9 @@ def detect_plates(image_bgr):
     blob = padded[:, :, ::-1].transpose(2, 0, 1).astype(np.float32) / 255.0
     blob = np.expand_dims(blob, axis=0)
     
-    # Run inference
     input_name = plate_session.get_inputs()[0].name
     output = plate_session.run(None, {input_name: blob})[0]
     
-    # Postprocess - YOLOv11 output shape
     plates = []
     predictions = output[0].transpose()
     
@@ -138,7 +184,6 @@ def detect_plates(image_bgr):
         if confidence < 0.4:
             continue
         
-        # Convert to original image coordinates
         x1 = (x_c - pw / 2 - pad_x) / scale
         y1 = (y_c - ph / 2 - pad_y) / scale
         x2 = (x_c + pw / 2 - pad_x) / scale
@@ -150,7 +195,6 @@ def detect_plates(image_bgr):
         if x2 > x1 and y2 > y1:
             plates.append((x1, y1, x2, y2))
     
-    # NMS to remove duplicates
     if len(plates) > 1:
         boxes = [[p[0], p[1], p[2]-p[0], p[3]-p[1]] for p in plates]
         scores = [1.0] * len(plates)
@@ -183,9 +227,23 @@ def apply_blur(image_bgr, regions, blur_strength=99):
     return image_bgr
 
 
+# --- Routes ---
+
+@app.route("/")
+def index():
+    return send_from_directory(app.static_folder, 'index.html')
+
+
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "models": {"mediapipe_face": True, "yolov8_onnx": ort_session is not None, "plate_detect": plate_session is not None}})
+    return jsonify({
+        "status": "ok",
+        "models": {
+            "mediapipe_face": True,
+            "yolov8_onnx": ort_session is not None,
+            "plate_detect": plate_session is not None
+        }
+    })
 
 
 @app.route("/redact", methods=["POST"])
@@ -211,75 +269,67 @@ def redact():
         _, buffer = cv2.imencode(".jpg", image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 90])
         redacted_b64 = base64.b64encode(buffer).decode("utf-8")
         
-        return jsonify({"redacted": len(all_regions) > 0, "redactedBase64": redacted_b64, "facesBlurred": len(faces), "platesBlurred": len(plates), "vehiclesDetected": len(vehicles)})
+        return jsonify({
+            "redacted": len(all_regions) > 0,
+            "redactedBase64": redacted_b64,
+            "facesBlurred": len(faces),
+            "platesBlurred": len(plates),
+            "vehiclesDetected": len(vehicles)
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/info", methods=["GET"])
-def api_info():
-    return jsonify({"service": "Toronto 311 Image Redactor", "version": "2.0.0", "endpoints": {"/health": "GET - Health check", "/redact": "POST - Redact faces and plates from image"}})
+@app.route("/api/chat", methods=["POST"])
+def chat():
+    """Send message to Austin agent via Apex REST with JWT auth."""
+    try:
+        data = request.get_json()
+        message = data.get('message', '')
+        session_id = data.get('sessionId')
+        
+        # Get token via JWT Bearer
+        access_token, instance_url = get_sf_access_token()
+        
+        url = f"{instance_url}/services/apexrest/austin"
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+        payload = {
+            'message': message,
+            'sessionId': session_id
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, str):
+                import json
+                result = json.loads(result)
+            return jsonify(result)
+        else:
+            return jsonify({'success': False, 'error': f'Salesforce error: {response.status_code} - {response.text}'}), 500
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route("/api/test-auth", methods=["GET"])
+def test_auth():
+    """Test JWT authentication."""
+    try:
+        token, instance_url = get_sf_access_token()
+        return jsonify({
+            'success': True,
+            'instance_url': instance_url,
+            'token_preview': token[:20] + '...'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-
-# --- Agentforce Chat Integration ---
-import requests
-
-SF_INSTANCE_URL = os.environ.get('SF_INSTANCE_URL')
-SF_ACCESS_TOKEN = os.environ.get('SF_ACCESS_TOKEN')
-
-@app.route("/api/chat", methods=["POST"])
-def chat():
-    """Send message to Austin via Apex REST"""
-    data = request.get_json()
-    message = data.get('message', '')
-    session_id = data.get('sessionId')
-    
-    url = f"{SF_INSTANCE_URL}/services/apexrest/austin"
-    
-    headers = {
-        'Authorization': f'Bearer {SF_ACCESS_TOKEN}',
-        'Content-Type': 'application/json'
-    }
-    
-    payload = {
-        'action': 'chat',
-        'message': message,
-        'sessionId': session_id
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        if response.status_code == 200:
-            import json
-            result = response.json()
-            if isinstance(result, str):
-                result = json.loads(result)
-            return jsonify(result)
-        else:
-            return jsonify({'success': False, 'error': f'Salesforce error: {response.status_code}'}), 500
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route("/test-applink", methods=["GET"])
-def test_applink():
-    """Test AppLink authorization"""
-    import requests
-    APPLINK_API_URL = os.environ.get('HEROKU_APPLINK_API_URL')
-    APPLINK_TOKEN = os.environ.get('HEROKU_APPLINK_TOKEN')
-    
-    url = f"{APPLINK_API_URL}/authorizations/toronto_auth"
-    headers = {"Authorization": f"Bearer {APPLINK_TOKEN}"}
-    resp = requests.get(url, headers=headers)
-    return jsonify({
-        "status": resp.status_code,
-        "response": resp.json() if resp.status_code == 200 else resp.text
-    })
-
-@app.route("/", methods=["GET"])
-def index():
-    return app.send_static_file('index.html')
