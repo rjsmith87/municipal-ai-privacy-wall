@@ -287,9 +287,20 @@ def chat():
         data = request.get_json()
         message = data.get('message', '')
         session_id = data.get('sessionId')
+        image_base64 = data.get('imageBase64')
         
         # Get token via JWT Bearer
         access_token, instance_url = get_sf_access_token()
+        
+        # If image provided, upload to Salesforce first
+        if image_base64:
+            print('📷 Uploading image to Salesforce...')
+            content_doc_id = upload_image_to_salesforce(image_base64)
+            if content_doc_id:
+                message = f"{message}\n\n[Photo uploaded - ContentDocumentId: {content_doc_id}. Please analyze this image using the Analyze_311_Photo action.]"
+                print('✓ Image uploaded, added to message context')
+            else:
+                print('⚠ Image upload failed, continuing without image')
         
         url = f"{instance_url}/services/apexrest/austin"
         headers = {
