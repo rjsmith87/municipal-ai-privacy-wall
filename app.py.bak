@@ -7,7 +7,6 @@ Auth: JWT Bearer Flow
 
 import base64
 import os
-import re
 import time
 from io import BytesIO
 
@@ -34,9 +33,11 @@ def get_sf_access_token():
     """Get Salesforce access token via JWT Bearer flow, with caching."""
     global _sf_token_cache
     
+    # Return cached token if still valid (with 5 min buffer)
     if _sf_token_cache['token'] and time.time() < _sf_token_cache['expires_at'] - 300:
         return _sf_token_cache['token'], _sf_token_cache['instance_url']
     
+    # Build JWT
     claim = {
         'iss': SF_CONSUMER_KEY,
         'sub': SF_USERNAME,
@@ -46,6 +47,7 @@ def get_sf_access_token():
     
     assertion = jwt.encode(claim, SF_PRIVATE_KEY, algorithm='RS256')
     
+    # Token endpoint
     token_url = f"{SF_LOGIN_URL}/services/oauth2/token"
     resp = requests.post(token_url, data={
         'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
@@ -59,13 +61,11 @@ def get_sf_access_token():
     _sf_token_cache = {
         'token': data['access_token'],
         'instance_url': data['instance_url'],
-        'expires_at': time.time() + 7200
+        'expires_at': time.time() + 7200  # 2 hour cache
     }
     
     print(f"✓ Got new Salesforce token")
     return _sf_token_cache['token'], _sf_token_cache['instance_url']
-
-
 def upload_image_to_salesforce(image_base64, filename="311_photo.jpg"):
     """Upload image to Salesforce as ContentDocument, return ContentDocumentId."""
     access_token, instance_url = get_sf_access_token()
@@ -136,66 +136,6 @@ def invoke_analyze_photo_flow(content_doc_id):
     return None
 
 
-def invoke_create_case_flow(case_data):
-    """Call the Create 311 Service Case Flow via Salesforce REST API."""
-    access_token, instance_url = get_sf_access_token()
-    
-    url = f"{instance_url}/services/data/v62.0/actions/custom/flow/Create_311_Service_Case"
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Content-Type': 'application/json'
-    }
-    
-    payload = {
-        'inputs': [{
-            'subject': case_data.get('subject', ''),
-            'description': case_data.get('description', ''),
-            'category': case_data.get('category', ''),
-            'subtype': case_data.get('subtype', ''),
-            'priority': case_data.get('priority', 'Medium'),
-            'queueId': case_data.get('queueId', ''),
-            'aiSummary': case_data.get('aiSummary', ''),
-            'confidence': int(case_data.get('confidence', 80)),
-            'safetyFlag': case_data.get('safetyFlag', 'false').lower() == 'true'
-        }]
-    }
-    
-    print(f'📋 Creating 311 case: {case_data.get("subject")}')
-    resp = requests.post(url, headers=headers, json=payload, timeout=30)
-    
-    if resp.status_code == 200:
-        result = resp.json()
-        if result and len(result) > 0 and 'outputValues' in result[0]:
-            output = result[0]['outputValues']
-            print(f'✓ Case created: {output.get("caseNumber")}')
-            return {
-                'success': output.get('success', False),
-                'caseNumber': output.get('caseNumber'),
-                'caseId': output.get('caseId'),
-                'message': output.get('message')
-            }
-    
-    print(f'⚠ Case creation failed: {resp.status_code} - {resp.text}')
-    return {'success': False, 'message': f'Flow error: {resp.text}'}
-
-
-def parse_create_case_block(text):
-    """Extract case data from [CREATE_CASE]...[/CREATE_CASE] block."""
-    match = re.search(r'\[CREATE_CASE\](.*?)\[/CREATE_CASE\]', text, re.DOTALL)
-    if not match:
-        return None
-    
-    block = match.group(1)
-    case_data = {}
-    
-    for line in block.strip().split('\n'):
-        if ':' in line:
-            key, value = line.split(':', 1)
-            case_data[key.strip()] = value.strip()
-    
-    return case_data
-
-
 # --- Model Loading ---
 mp_face = mp.solutions.face_detection
 face_detector = mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5)
@@ -221,7 +161,7 @@ def load_models():
 
 load_models()
 
-VEHICLE_CLASSES = {2, 3, 5, 7}
+VEHICLE_CLASSES = {2, 3, 5, 7}  # car, motorcycle, bus, truck
 
 
 def preprocess_for_yolo(image_bgr, input_size=640):
@@ -417,30 +357,15 @@ def chat():
         session_id = data.get('sessionId')
         image_base64 = data.get('imageBase64')
         
+        # Get token via JWT Bearer
         access_token, instance_url = get_sf_access_token()
         
-        # If image provided, redact and upload to Salesforce
+        # If image provided, upload to Salesforce first
         if image_base64:
-            print('📷 Processing image...')
-            
-            image_data = base64.b64decode(image_base64)
-            pil_image = Image.open(BytesIO(image_data)).convert("RGB")
-            image_rgb = np.array(pil_image)
-            image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
-            
-            faces = detect_faces(image_rgb)
-            plates = detect_plates(image_bgr)
-            
-            all_regions = faces + plates
-            if all_regions:
-                image_bgr = apply_blur(image_bgr, all_regions)
-                print(f'✓ Redacted {len(faces)} faces, {len(plates)} plates')
-            
-            _, buffer = cv2.imencode(".jpg", image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 90])
-            redacted_b64 = base64.b64encode(buffer).decode("utf-8")
-            
-            content_doc_id = upload_image_to_salesforce(redacted_b64)
+            print('📷 Uploading image to Salesforce...')
+            content_doc_id = upload_image_to_salesforce(image_base64)
             if content_doc_id:
+                # Call the Flow directly to analyze the photo
                 analysis = invoke_analyze_photo_flow(content_doc_id)
                 if analysis:
                     message = f"{message}\n\n[Photo Analysis Result]\n{analysis}\n\nContentDocumentId: {content_doc_id}"
@@ -451,7 +376,6 @@ def chat():
             else:
                 print('⚠ Image upload failed, continuing without image')
         
-        # Send to Austin
         url = f"{instance_url}/services/apexrest/austin"
         headers = {
             'Authorization': f'Bearer {access_token}',
@@ -469,25 +393,6 @@ def chat():
             if isinstance(result, str):
                 import json
                 result = json.loads(result)
-            
-            # Check if Austin wants to create a case
-            austin_reply = result.get('reply', '')
-            case_data = parse_create_case_block(austin_reply)
-            
-            if case_data:
-                print('🔍 Detected CREATE_CASE block, invoking Flow...')
-                case_result = invoke_create_case_flow(case_data)
-                
-                if case_result.get('success'):
-                    clean_reply = austin_reply.split('[CREATE_CASE]')[0].strip()
-                    result['reply'] = f"{clean_reply}\n\n✅ Case #{case_result['caseNumber']} has been created. A city worker will address this issue."
-                    result['caseNumber'] = case_result['caseNumber']
-                    result['caseId'] = case_result['caseId']
-                else:
-                    clean_reply = austin_reply.split('[CREATE_CASE]')[0].strip()
-                    result['reply'] = f"{clean_reply}\n\n⚠️ There was an issue creating your case. Please try again or call 311 directly."
-                    result['error'] = case_result.get('message')
-            
             return jsonify(result)
         else:
             return jsonify({'success': False, 'error': f'Salesforce error: {response.status_code} - {response.text}'}), 500
