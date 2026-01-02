@@ -396,6 +396,13 @@ def redact():
         if all_regions:
             image_bgr = apply_blur(image_bgr, all_regions)
         
+        # Resize if too large for mobile browsers
+        max_dim = 1200
+        h, w = image_bgr.shape[:2]
+        if max(h, w) > max_dim:
+            scale = max_dim / max(h, w)
+            image_bgr = cv2.resize(image_bgr, (int(w * scale), int(h * scale)))
+
         _, buffer = cv2.imencode(".jpg", image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 90])
         redacted_b64 = base64.b64encode(buffer).decode("utf-8")
         
