@@ -1,458 +1,1074 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Background Check Management System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City of Toronto</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            background: #f5f7fa;
-            color: #2c3e50;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            font-size: 14px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #333;
+            line-height: 1.5;
         }
+
+        /* Header */
         .header {
-            background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
-            color: white;
-            padding: 20px 40px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 0 20px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.4) 70%, transparent 100%);
         }
-        .header h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        .header .subtitle {
-            font-size: 13px;
-            opacity: 0.9;
-        }
-        .container {
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             max-width: 1400px;
             margin: 0 auto;
-            padding: 30px;
+            padding: 15px 0;
         }
-        .tabs {
+
+        .logo {
             display: flex;
-            gap: 2px;
-            background: white;
-            border-radius: 8px 8px 0 0;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            align-items: center;
+            gap: 10px;
+            color: white;
+            text-decoration: none;
         }
-        .tab {
-            flex: 1;
-            padding: 16px 24px;
-            text-align: center;
-            cursor: pointer;
-            background: white;
-            color: #64748b;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s ease;
-            font-weight: 500;
+
+        .logo-icon {
+            width: 50px;
+            height: 50px;
         }
-        .tab:hover {
-            background: #f8fafc;
-            color: #2c5282;
-        }
-        .tab.active {
-            color: #2c5282;
-            border-bottom-color: #2c5282;
-            background: #f8fafc;
-        }
-        .content {
-            background: white;
-            padding: 30px;
-            border-radius: 0 0 8px 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            min-height: 500px;
-        }
-        .content-section {
-            display: none;
-        }
-        .content-section.active {
-            display: block;
-            animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .stat-card {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            border-radius: 8px;
-            padding: 24px;
-            border-left: 4px solid #2c5282;
-        }
-        .stat-label {
-            font-size: 12px;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-        .stat-number {
+
+        .logo-text {
             font-size: 32px;
             font-weight: 700;
-            color: #1e293b;
+            letter-spacing: 2px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
-        .section-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1e293b;
-            margin: 30px 0 20px 0;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e2e8f0;
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th {
-            background: #f8fafc;
-            padding: 12px 16px;
-            text-align: left;
-            font-weight: 600;
-            color: #475569;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        td {
-            padding: 14px 16px;
-            border-bottom: 1px solid #f1f5f9;
-            color: #334155;
-        }
-        tr:hover {
-            background: #f8fafc;
-        }
-        .badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .badge-completed {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        .badge-delayed {
-            background: #fed7aa;
-            color: #92400e;
-        }
-        .badge-escalated {
-            background: #fecaca;
-            color: #991b1b;
-        }
-        .badge-progress {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-        .badge-review {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        .risk-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .risk-low { background: #d1fae5; color: #065f46; }
-        .risk-medium { background: #fed7aa; color: #92400e; }
-        .risk-high { background: #fecaca; color: #991b1b; }
-        .footer {
-            margin-top: 30px;
-            padding: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #94a3b8;
+
+        .search-box {
+            display: flex;
+            align-items: center;
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-        .timestamp {
-            font-size: 12px;
-            color: #94a3b8;
-        }
-        .reset-btn {
-            background: #ef4444;
-            color: white;
+
+        .search-box input {
             border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
+            padding: 8px 12px;
+            width: 200px;
+            font-size: 14px;
+        }
+
+        .search-box input:focus {
+            outline: none;
+        }
+
+        .search-box button {
+            background: white;
+            border: none;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .font-size {
+            display: flex;
+            gap: 5px;
+        }
+
+        .font-size button {
+            background: white;
+            border: 1px solid #ccc;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        .i-want-to {
+            background: #f5a623;
+            color: black;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 3px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-        .reset-btn:hover {
-            background: #dc2626;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+
+        .contact-311 {
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 10px 15px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.4);
         }
-        .reset-btn:disabled {
-            background: #9ca3af;
+
+        /* Navigation */
+        .nav {
+            position: absolute;
+            top: 80px;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: transparent;
+        }
+
+        .nav-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+        }
+
+        .nav a {
+            color: white;
+            text-decoration: none;
+            padding: 15px 25px;
+            font-size: 15px;
+            transition: background 0.2s;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+
+        .nav a:hover {
+            background: rgba(255,255,255,0.15);
+            border-radius: 4px;
+        }
+
+        /* Hero */
+        .hero {
+            position: relative;
+            height: 85vh;
+            min-height: 600px;
+            max-height: 900px;
+            background: url('https://res.cloudinary.com/drymqnofp/image/upload/v1767376694/Screenshot_2026-01-02_at_10.57.59_AM_qbimvl.png') center center;
+            background-size: cover;
+            background-position: center 30%;
+        }
+
+        /* Category Bar */
+        .category-bar {
+            display: flex;
+            justify-content: center;
+            background: #1e5c87;
+            flex-wrap: wrap;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 10;
+        }
+
+        .category-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 40px;
+            color: white;
+            text-decoration: none;
+            transition: background 0.2s;
+            min-width: 150px;
+        }
+
+        .category-item:hover {
+            background: #164666;
+        }
+
+        .category-item.active {
+            background: #164666;
+            position: relative;
+        }
+
+        .category-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #164666;
+        }
+
+        .category-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .category-label {
+            font-size: 14px;
+            text-align: center;
+        }
+
+        /* Quick Links */
+        .quick-links {
+            background: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .quick-links a {
+            color: #1e5c87;
+            text-decoration: underline;
+            margin: 0 20px;
+            font-size: 15px;
+        }
+
+        .quick-links a:hover {
+            color: #164666;
+        }
+
+        /* What's New Section */
+        .whats-new {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .whats-new h2 {
+            font-size: 28px;
+            font-weight: 400;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #1e5c87;
+        }
+
+        .news-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 25px;
+        }
+
+        @media (max-width: 1000px) {
+            .news-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .news-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .news-card {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .news-card img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .news-card-body {
+            padding: 15px 0;
+        }
+
+        .news-card h3 {
+            color: #1e5c87;
+            font-size: 16px;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+
+        .news-card p {
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Footer */
+        .footer-feedback {
+            background: white;
+            padding: 20px;
+            border-top: 1px solid #ddd;
+        }
+
+        .footer-feedback summary {
+            max-width: 1400px;
+            margin: 0 auto;
+            cursor: pointer;
+            color: #1e5c87;
+            font-size: 16px;
+            text-decoration: underline;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-feedback summary::after {
+            content: '+';
+            font-size: 24px;
+            color: #1e5c87;
+        }
+
+        .footer {
+            background: #1e5c87;
+            color: white;
+            padding: 30px 20px;
+        }
+
+        .footer-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+            font-size: 14px;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+
+        .footer-social {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .footer-social span {
+            font-size: 14px;
+        }
+
+        .footer-social a {
+            width: 32px;
+            height: 32px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            font-size: 16px;
+        }
+
+        .footer-bottom {
+            background: #164666;
+            padding: 15px 20px;
+            color: white;
+            font-size: 13px;
+        }
+
+        .footer-bottom-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .footer-bottom a {
+            color: white;
+            text-decoration: none;
+        }
+
+        .footer-bottom a:hover {
+            text-decoration: underline;
+        }
+
+        /* Chat Widget */
+        .chat-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: #1e5c87;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .chat-toggle:hover {
+            transform: scale(1.05);
+            background: #164666;
+        }
+
+        .chat-toggle svg {
+            width: 28px;
+            height: 28px;
+            fill: white;
+        }
+
+        .chat-widget {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 380px;
+            height: 550px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 5px 40px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-widget.open {
+            display: flex;
+        }
+
+        .chat-header {
+            background: #1e5c87;
+            color: white;
+            padding: 18px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chat-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .chat-header p {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .chat-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+            line-height: 1;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .message.assistant {
+            background: white;
+            align-self: flex-start;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.user {
+            background: #1e5c87;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+
+        .chat-input-area {
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .image-preview {
+            display: none;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .image-preview.active {
+            display: block;
+        }
+
+        .image-preview img {
+            max-height: 100px;
+            border-radius: 8px;
+            border: 2px solid #1e5c87;
+        }
+
+        .image-preview .remove-image {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .processing-indicator {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #e8f4fd;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            color: #1e5c87;
+        }
+
+        .processing-indicator.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #1e5c87;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .chat-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .chat-input-row textarea {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 14px;
+            resize: none;
+            font-family: inherit;
+            min-height: 44px;
+            max-height: 100px;
+        }
+
+        .chat-input-row textarea:focus {
+            outline: none;
+            border-color: #1e5c87;
+        }
+
+        .chat-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .attach-btn {
+            width: 44px;
+            height: 44px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .attach-btn:hover {
+            background: #e8e8e8;
+        }
+
+        .attach-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: #666;
+        }
+
+        .send-btn {
+            width: 44px;
+            height: 44px;
+            background: #1e5c87;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .send-btn:hover {
+            background: #164666;
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
             cursor: not-allowed;
-            transform: none;
         }
-        .info-text {
-            color: #64748b;
-            line-height: 2;
+
+        .send-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
         }
-        .info-text p {
-            margin: 10px 0;
+
+        .privacy-notice {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            font-size: 11px;
+            color: #666;
+        }
+
+        .privacy-notice svg {
+            width: 14px;
+            height: 14px;
+            fill: #28a745;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .header-right {
+                display: none;
+            }
+
+            .nav {
+                display: none;
+            }
+
+            .category-item {
+                padding: 15px 20px;
+                min-width: 100px;
+            }
+
+            .chat-widget {
+                width: calc(100% - 20px);
+                right: 10px;
+                bottom: 80px;
+                height: 70vh;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Background Check Management System</h1>
-        <div class="subtitle">Municipal Government Personnel Division</div>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-top">
+            <a href="#" class="logo">
+                <svg class="logo-icon" viewBox="0 0 50 50">
+                    <rect x="5" y="15" width="8" height="30" fill="white"/>
+                    <rect x="15" y="5" width="8" height="40" fill="white"/>
+                    <rect x="25" y="10" width="8" height="35" fill="white"/>
+                    <rect x="35" y="20" width="8" height="25" fill="white"/>
+                </svg>
+                <span class="logo-text">TORONTO</span>
+            </a>
+            <div class="header-right">
+                <div class="search-box">
+                    <input type="text" placeholder="Search">
+                    <button>🔍</button>
+                </div>
+                <div class="font-size">
+                    <button>A+</button>
+                    <button>A-</button>
+                </div>
+                <button class="i-want-to">I want to... ▼</button>
+                <a href="#" class="contact-311" onclick="toggleChat(); return false;">Contact 311</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="#">Services & Payments</a>
+            <a href="#">Community & People</a>
+            <a href="#">Business & Economy</a>
+            <a href="#">Explore & Enjoy</a>
+            <a href="#">City Government</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero"></section>
+
+    <!-- Category Bar -->
+    <div class="category-bar">
+        <a href="#" class="category-item active">
+            <span class="category-icon">📈</span>
+            <span class="category-label">Trending</span>
+        </a>
+        <a href="#" class="category-item">
+            <span class="category-icon">❤️</span>
+            <span class="category-label">Healthy Living</span>
+        </a>
+        <a href="#" class="category-item">
+            <span class="category-icon">🚶</span>
+            <span class="category-label">Getting Around</span>
+        </a>
+        <a href="#" class="category-item">
+            <span class="category-icon">📋</span>
+            <span class="category-label">Permits & Licences</span>
+        </a>
+        <a href="#" class="category-item">
+            <span class="category-icon">👥</span>
+            <span class="category-label">Your City</span>
+        </a>
+        <a href="#" class="category-item">
+            <span class="category-icon">🏠</span>
+            <span class="category-label">Your Property</span>
+        </a>
     </div>
 
-    <div class="container">
-        <div class="tabs">
-            <div class="tab active" onclick="showTab('dashboard')">Dashboard</div>
-            <div class="tab" onclick="showTab('records')">Active Records</div>
-            <div class="tab" onclick="showTab('search')">Search</div>
-            <div class="tab" onclick="showTab('reports')">Reports</div>
-            <div class="tab" onclick="showTab('system')">System</div>
+    <!-- Quick Links -->
+    <div class="quick-links">
+        <a href="#">Weather Winter Together</a>
+        <a href="#" onclick="toggleChat(); return false;">311</a>
+        <a href="#">2026 City Budget</a>
+        <a href="#">Adopt a Pet</a>
+    </div>
+
+    <!-- What's New -->
+    <section class="whats-new">
+        <h2>What's New</h2>
+        <div class="news-grid">
+            <a href="#" class="news-card">
+                <img src="https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=250&fit=crop" alt="Ice skating">
+                <div class="news-card-body">
+                    <h3>New Year's Skate Parties</h3>
+                    <p>On January 4 enjoy free skate rentals, hot chocolate and live DJs at four locations across the city.</p>
+                </div>
+            </a>
+            <a href="#" class="news-card">
+                <img src="https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=400&h=250&fit=crop" alt="Recycling bins">
+                <div class="news-card-body">
+                    <h3>Residential Recycling in 2026</h3>
+                    <p>Starting January 1, blue bins will no longer be City-run. A private company will take over residential recycling collection in Toronto.</p>
+                </div>
+            </a>
+            <a href="#" class="news-card">
+                <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=250&fit=crop" alt="Support services">
+                <div class="news-card-body">
+                    <h3>It's Okay to Ask for Help</h3>
+                    <p>Call 211 to access Toronto Community Crisis Service. A free, confidential mental health support, day and night, city-wide.</p>
+                </div>
+            </a>
+            <a href="#" class="news-card">
+                <img src="https://images.unsplash.com/photo-1483721310020-03333e577078?w=400&h=250&fit=crop" alt="Winter activities">
+                <div class="news-card-body">
+                    <h3>Winter Recreation</h3>
+                    <p>Don't miss out on fun Winter activities. Registration is now open.</p>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <details class="footer-feedback">
+        <summary>Page Feedback</summary>
+        <p style="padding: 20px;">Your feedback helps us improve toronto.ca</p>
+    </details>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-links">
+                <a href="#">Jobs at the City</a>
+                <a href="#">Media Room</a>
+                <a href="#">Contact Us</a>
+                <a href="#">Translate</a>
+            </div>
+            <div class="footer-social">
+                <span>Connect:</span>
+                <a href="#">𝕏</a>
+                <a href="#">f</a>
+                <a href="#">▶</a>
+                <a href="#">in</a>
+            </div>
+        </div>
+    </footer>
+
+    <div class="footer-bottom">
+        <div class="footer-bottom-inner">
+            <span>© City of Toronto 1998 - 2026</span>
+            <a href="#">Privacy</a>
+            <a href="#">Accessibility at the City of Toronto</a>
+        </div>
+    </div>
+
+    <!-- Chat Toggle Button -->
+    <button class="chat-toggle" onclick="toggleChat()" title="Contact 311">
+        <svg viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+        </svg>
+    </button>
+
+    <!-- Chat Widget -->
+    <div class="chat-widget" id="chatWidget">
+        <div class="chat-header">
+            <div class="chat-header-title">
+                <div>
+                    <h3>Toronto 311</h3>
+                    <p>Chat with Austin - Your Service Agent</p>
+                </div>
+            </div>
+            <button class="chat-close" onclick="toggleChat()">×</button>
         </div>
 
-        <div class="content">
-            <!-- DASHBOARD -->
-            <div id="dashboard" class="content-section active">
-                <div class="stats">
-                    <div class="stat-card">
-                        <div class="stat-label">Total Records</div>
-                        <div class="stat-number">{{ total }}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Completed</div>
-                        <div class="stat-number">{{ completed }}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">In Progress</div>
-                        <div class="stat-number">{{ in_progress }}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Escalated</div>
-                        <div class="stat-number">{{ escalated }}</div>
-                    </div>
-                </div>
-
-                <div class="section-title">Recent Activity</div>
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Status</th>
-                        <th>Risk Score</th>
-                        <th>Last Updated</th>
-                    </tr>
-                    {% for candidate in candidates %}
-                    <tr>
-                        <td>{{ '%03d'|format(candidate.id) }}</td>
-                        <td><a href="/candidate/{{ candidate.id }}" style="color: #2c5282; text-decoration: none; font-weight: 500;">{{ candidate.last_name }}, {{ candidate.first_name }}</a></td>
-                        <td>
-                            {% if candidate.overall_status == 'Completed' %}
-                                <span class="badge badge-completed">Completed</span>
-                            {% elif candidate.overall_status == 'Delayed' %}
-                                <span class="badge badge-delayed">Delayed</span>
-                            {% elif candidate.overall_status == 'In Progress' %}
-                                <span class="badge badge-progress">In Progress</span>
-                            {% elif candidate.overall_status == 'Pending Review' %}
-                                <span class="badge badge-review">Pending Review</span>
-                            {% endif %}
-                            {% if candidate.escalation_flag %}
-                                <span class="badge badge-escalated" style="margin-left: 4px;">🚨 ESCALATED</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if candidate.risk_score %}
-                                {% if candidate.risk_score < 0.30 %}
-                                    <span class="risk-badge risk-low">{{ "%.2f"|format(candidate.risk_score) }}</span>
-                                {% elif candidate.risk_score < 0.60 %}
-                                    <span class="risk-badge risk-medium">{{ "%.2f"|format(candidate.risk_score) }}</span>
-                                {% else %}
-                                    <span class="risk-badge risk-high">{{ "%.2f"|format(candidate.risk_score) }}</span>
-                                {% endif %}
-                            {% else %}
-                                <span class="risk-badge risk-low">N/A</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ candidate.updated_at.strftime('%b %d, %Y') if candidate.updated_at else 'N/A' }}</td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-
-            <!-- ACTIVE RECORDS -->
-            <div id="records" class="content-section">
-                <div class="section-title">Active Background Check Records</div>
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>SSN</th>
-                        <th>Status</th>
-                        <th>Risk Score</th>
-                        <th>Initiated</th>
-                        <th>Last Updated</th>
-                    </tr>
-                    {% for candidate in candidates %}
-                    <tr>
-                        <td>{{ '%03d'|format(candidate.id) }}</td>
-                        <td><a href="/candidate/{{ candidate.id }}" style="color: #2c5282; text-decoration: none; font-weight: 500;">{{ candidate.last_name }}, {{ candidate.first_name }}</a></td>
-                        <td>XXX-XX-{{ candidate.ssn[-4:] if candidate.ssn else '0000' }}</td>
-                        <td>
-                            {% if candidate.overall_status == 'Completed' %}
-                                <span class="badge badge-completed">Completed</span>
-                            {% elif candidate.overall_status == 'Delayed' %}
-                                <span class="badge badge-delayed">Delayed</span>
-                            {% elif candidate.overall_status == 'In Progress' %}
-                                <span class="badge badge-progress">In Progress</span>
-                            {% elif candidate.overall_status == 'Pending Review' %}
-                                <span class="badge badge-review">Pending Review</span>
-                            {% endif %}
-                            {% if candidate.escalation_flag %}
-                                <span class="badge badge-escalated" style="margin-left: 4px;">🚨 ESCALATED</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if candidate.risk_score %}
-                                {% if candidate.risk_score < 0.30 %}
-                                    <span class="risk-badge risk-low">{{ "%.2f"|format(candidate.risk_score) }}</span>
-                                {% elif candidate.risk_score < 0.60 %}
-                                    <span class="risk-badge risk-medium">{{ "%.2f"|format(candidate.risk_score) }}</span>
-                                {% else %}
-                                    <span class="risk-badge risk-high">{{ "%.2f"|format(candidate.risk_score) }}</span>
-                                {% endif %}
-                            {% else %}
-                                <span class="risk-badge risk-low">N/A</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ candidate.initiated_date.strftime('%b %d, %Y') if candidate.initiated_date else 'N/A' }}</td>
-                        <td>{{ candidate.updated_at.strftime('%b %d, %Y') if candidate.updated_at else 'N/A' }}</td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-
-            <!-- SEARCH -->
-            <div id="search" class="content-section">
-                <div class="section-title">Search Records</div>
-                <div class="info-text">
-                    <p style="margin-bottom: 20px;">Enter search criteria to locate candidate records:</p>
-                    <p><strong>Last Name:</strong> <span style="color: #cbd5e1;">_____________</span></p>
-                    <p><strong>SSN:</strong> <span style="color: #cbd5e1;">___-__-____</span></p>
-                    <p><strong>Status:</strong> <span style="color: #cbd5e1;">All / Completed / Delayed / Escalated</span></p>
-                    <p style="margin-top: 30px; color: #94a3b8; font-size: 13px;">Search functionality available in production environment</p>
-                </div>
-            </div>
-
-            <!-- REPORTS -->
-            <div id="reports" class="content-section">
-                <div class="section-title">Generate Reports</div>
-                <div class="info-text">
-                    <p style="margin-bottom: 20px;">Available report types:</p>
-                    <p>• Weekly Completion Summary</p>
-                    <p>• Escalated Cases Report</p>
-                    <p>• Average Processing Time Analysis</p>
-                    <p>• Risk Score Distribution</p>
-                    <p>• Audit Trail Export</p>
-                    <p>• Compliance Summary</p>
-                    <p style="margin-top: 30px; color: #94a3b8; font-size: 13px;">Report generation available in production environment</p>
-                </div>
-            </div>
-
-            <!-- SYSTEM -->
-            <div id="system" class="content-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <div class="section-title" style="margin: 0; border: none; padding: 0;">System Information</div>
-                    <button class="reset-btn" onclick="resetDemo()">🔄 Reset Demo</button>
-                </div>
-                <div class="info-text">
-                    <p><strong>Database Status:</strong> <span style="color: #059669;">Connected</span></p>
-                    <p><strong>Total Records:</strong> {{ total }}</p>
-                    <p><strong>System Uptime:</strong> 99.94%</p>
-                    <p><strong>Last Backup:</strong> Oct 30, 2025 2:00 AM UTC</p>
-                    
-                    <div class="section-title">API Endpoints</div>
-                    <p style="font-family: monospace; font-size: 13px; line-height: 2;"><span style="color: #059669; font-weight: 600;">GET</span> /api/candidates</p>
-                    <p style="font-family: monospace; font-size: 13px; line-height: 2;"><span style="color: #059669; font-weight: 600;">GET</span> /api/candidate/{id}</p>
-                    <p style="font-family: monospace; font-size: 13px; line-height: 2;"><span style="color: #2563eb; font-weight: 600;">POST</span> /api/escalate</p>
-                    <p style="font-family: monospace; font-size: 13px; line-height: 2;"><span style="color: #d97706; font-weight: 600;">PATCH</span> /api/candidate/{id}/status</p>
-                    <p style="font-family: monospace; font-size: 13px; line-height: 2;"><span style="color: #2563eb; font-weight: 600;">POST</span> /api/candidate/{id}/notes</p>
-                    <p style="font-family: monospace; font-size: 13px; line-height: 2;"><span style="color: #2563eb; font-weight: 600;">POST</span> /api/reset-demo</p>
-                    <p style="font-family: monospace; font-size: 13px; line-height: 2;"><span style="color: #059669; font-weight: 600;">GET</span> /health</p>
-                </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                Hello! I'm Austin, your Toronto 311 service agent. How can I help you today? You can describe an issue or upload a photo.
             </div>
         </div>
 
-        <div class="footer">
-            Department of Personnel Management • Background Check Management System v2.1 • © 2025
+        <div class="chat-input-area">
+            <div class="image-preview" id="imagePreview">
+                <img id="previewImg" src="" alt="Preview">
+                <button class="remove-image" onclick="removeImage()">×</button>
+            </div>
+
+            <div class="processing-indicator" id="processingIndicator">
+                <div class="spinner"></div>
+                <span>Processing image for privacy...</span>
+            </div>
+
+            <div class="chat-input-row">
+                <textarea 
+                    id="messageInput" 
+                    placeholder="Describe your issue..."
+                    rows="1"
+                    onkeydown="handleKeyDown(event)"
+                ></textarea>
+                <div class="chat-buttons">
+                    <label class="attach-btn" title="Attach Photo">
+                        <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageSelect(event)">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                        </svg>
+                    </label>
+                    <button class="send-btn" onclick="sendMessage()" id="sendBtn" title="Send">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="privacy-notice">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+                </svg>
+                <span>Privacy Protected: Images are automatically processed to blur faces and license plates.</span>
+            </div>
         </div>
     </div>
 
     <script>
-        // Reset Demo Function
-        async function resetDemo() {
-            const btn = event.target;
-            btn.disabled = true;
-            btn.innerHTML = "⏳ Resetting...";
-            
-            try {
-                const response = await fetch("/api/reset-demo", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"}
-                });
-                const data = await response.json();
-                
-                if (response.ok) {
-                    alert(data.message + " - Reloading page...");
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    alert("Reset failed: " + data.message);
-                    btn.disabled = false;
-                    btn.innerHTML = "🔄 Reset Demo";
-                }
-            } catch (error) {
-                alert("Network error: " + error.message);
-                btn.disabled = false;
-                btn.innerHTML = "🔄 Reset Demo";
+        let selectedImage = null;
+        let redactedImageBase64 = null;
+
+        function toggleChat() {
+            const widget = document.getElementById('chatWidget');
+            widget.classList.toggle('open');
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
             }
         }
 
-        // Tab Navigation
-        function showTab(tabName) {
-            document.querySelectorAll('.content-section').forEach(section => {
-                section.classList.remove('active');
-            });
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
+        async function handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            selectedImage = file;
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64 = e.target.result.split(',')[1];
+                
+                // Show processing indicator
+                document.getElementById('processingIndicator').classList.add('active');
+                document.getElementById('imagePreview').classList.remove('active');
+                
+                try {
+                    // Send to redaction endpoint
+                    const response = await fetch('/redact', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ imageBase64: base64 })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.redactedImageBase64) {
+                        redactedImageBase64 = data.redactedImageBase64;
+                        document.getElementById('previewImg').src = 'data:image/jpeg;base64,' + redactedImageBase64;
+                        
+                        // Show blur stats if any
+                        const blurInfo = [];
+                        if (data.facesBlurred > 0) blurInfo.push(data.facesBlurred + ' face(s)');
+                        if (data.platesBlurred > 0) blurInfo.push(data.platesBlurred + ' plate(s)');
+                        
+                        if (blurInfo.length > 0) {
+                            console.log('Blurred:', blurInfo.join(', '));
+                        }
+                    } else {
+                        // No redaction needed or error, use original
+                        redactedImageBase64 = base64;
+                        document.getElementById('previewImg').src = e.target.result;
+                    }
+                    
+                    document.getElementById('imagePreview').classList.add('active');
+                } catch (error) {
+                    console.error('Redaction error:', error);
+                    // Fall back to original image
+                    redactedImageBase64 = base64;
+                    document.getElementById('previewImg').src = e.target.result;
+                    document.getElementById('imagePreview').classList.add('active');
+                }
+                
+                document.getElementById('processingIndicator').classList.remove('active');
+            };
+            reader.readAsDataURL(file);
         }
 
-        // Update Timestamp
-        function updateTimestamp() {
-            const now = new Date();
-            document.getElementById('timestamp').textContent = now.toLocaleString();
+        function removeImage() {
+            selectedImage = null;
+            redactedImageBase64 = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('imagePreview').classList.remove('active');
         }
-        updateTimestamp();
-        setInterval(updateTimestamp, 1000);
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message && !redactedImageBase64) return;
+            
+            const messagesContainer = document.getElementById('chatMessages');
+            
+            // Add user message
+            const userMsg = document.createElement('div');
+            userMsg.className = 'message user';
+            
+            let userContent = message;
+            if (redactedImageBase64) {
+                userContent += (message ? '<br>' : '') + '<img src="data:image/jpeg;base64,' + redactedImageBase64 + '" alt="Uploaded image">';
+            }
+            userMsg.innerHTML = userContent || 'Image attached';
+            messagesContainer.appendChild(userMsg);
+            
+            // Clear input
+            input.value = '';
+            const imageToSend = redactedImageBase64;
+            removeImage();
+            
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Show typing indicator
+            const typingMsg = document.createElement('div');
+            typingMsg.className = 'message assistant';
+            typingMsg.innerHTML = '<em>Austin is typing...</em>';
+            messagesContainer.appendChild(typingMsg);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            try {
+                // Send to chat endpoint
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        imageBase64: imageToSend
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Remove typing indicator
+                typingMsg.remove();
+                
+                // Add assistant response
+                const assistantMsg = document.createElement('div');
+                assistantMsg.className = 'message assistant';
+                assistantMsg.textContent = data.response || data.message || 'I apologize, but I encountered an issue. Please try again.';
+                messagesContainer.appendChild(assistantMsg);
+                
+            } catch (error) {
+                console.error('Chat error:', error);
+                typingMsg.remove();
+                
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'message assistant';
+                errorMsg.textContent = 'I apologize, but I\'m having trouble connecting. Please try again in a moment.';
+                messagesContainer.appendChild(errorMsg);
+            }
+            
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Auto-resize textarea
+        document.getElementById('messageInput').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+        });
     </script>
 </body>
 </html>
