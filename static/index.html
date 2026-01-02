@@ -915,6 +915,7 @@
 
     <script>
         let selectedImage = null;
+        let sessionId = null;
         let redactedBase64 = null;
 
         function toggleChat() {
@@ -1034,6 +1035,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message: message,
+                        sessionId: sessionId,
                         imageBase64: imageToSend
                     })
                 });
@@ -1042,6 +1044,9 @@
                 
                 // Remove typing indicator
                 typingMsg.remove();
+                
+                // Capture sessionId for context
+                if (data.sessionId) sessionId = data.sessionId;
                 
                 // Add assistant response
                 const assistantMsg = document.createElement('div');
