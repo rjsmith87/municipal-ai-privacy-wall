@@ -396,8 +396,9 @@ def get_head_regions(persons, faces, head_ratio=0.35):
     """Get head regions for persons not already covered by face detection"""
     head_regions = []
     for (px1, py1, px2, py2) in persons:
+        top_offset = int((py2 - py1) * 0.05)  # skip top padding
         head_h = int((py2 - py1) * head_ratio)
-        head_region = (px1, py1, px2, py1 + head_h)
+        head_region = (px1, py1 + top_offset, px2, py1 + top_offset + head_h)
         
         # Check if any face overlaps this head region
         has_face = False
