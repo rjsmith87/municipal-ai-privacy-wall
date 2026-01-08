@@ -392,7 +392,7 @@ def detect_faces(image_rgb):
 
 
 
-def get_head_regions(persons, faces, head_ratio=0.28):
+def get_head_regions(persons, faces, head_ratio=0.35):
     """Get head regions for persons not already covered by face detection"""
     head_regions = []
     for (px1, py1, px2, py2) in persons:
