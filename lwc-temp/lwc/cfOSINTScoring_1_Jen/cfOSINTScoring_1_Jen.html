@@ -1,0 +1,65 @@
+<template>
+            <div class="slds-grid slds-wrap slds-is-relative ">
+            <div style="position: fixed;z-index: 999999;top: 0;right: 0;">
+  <omnistudio-toast class="flexcard-toast-element" theme="slds" title="" message="" styletype=""> </omnistudio-toast>
+</div>
+            <div if:true={showLoader} class="slds-is-absolute vloc-loader_override" style="height: 100%; width: 100%; min-height:50px; background: transparent; z-index: 99;">
+  <div>
+   <omnistudio-spinner
+      variant="brand"
+      alternative-text="Loading content..."
+      size="medium"
+      theme="slds"
+      ></omnistudio-spinner>
+  </div>
+</div>
+            <template if:false={hasPermission}>
+              You don't have required permissions to view this card.
+            </template>
+            <template if:true={hasPermission}>
+              <template if:true={hasRecords}>
+                        <template for:each={_records} for:item="record" for:index="rindex">
+                            <omnistudio-flex-card-state if:true={record}  key={record._flex.uniqueKey} data-recordid={record.Id} record={record} data-statue="true"  data-index="0" data-rindex={rindex} class="cf-vlocity-state-0 cf-vlocity-state slds-size_12-of-12"  tracking-obj={_childCardTrackingObj} >
+      <div if:true={cardLoaded} class="slds-grid slds-wrap slds-card slds-p-around_x-small slds-m-bottom_x-small" style="">
+          <div data-style-id="state0element0" class="slds-col  slds-text-align_center  slds-size_1-of-12  " data-rindex={rindex} style="      
+         " ><omnistudio-flex-icon data-style-id="state0element0_child"   card={card}  record={record}  icon-type="Salesforce SVG"  icon-name="action:info"  size="medium"  extraclass="slds-icon_container slds-icon-action-info slds-icon_container--circle"  variant="inverse"  imgsrc=""  theme="slds"  ></omnistudio-flex-icon>
+      </div><div data-style-id="state0element1" class="slds-col   slds-p-around_x-small slds-size_11-of-12  " data-rindex={rindex} style="" >
+    <omnistudio-block data-style-id="state0element1_child"  card={card}  record={record}  label="Scoring"  collapsible="true"  collapsed-by-default="false"  theme="slds"  ><div class="slds-grid slds-wrap">
+          <div data-style-id="state0element1block_element0" class="slds-col   slds-size_6-of-12  " data-rindex={rindex} style="" ><omnistudio-output-field data-style-id="state0element1block_element0_child"   card={card}  record={record}  merge-field="%3Cdiv%20class=%22p-rich_text_section%22%3E%3Cspan%20style=%22text-decoration:%20underline;%22%3E%3Cstrong%20class=%22slds-text-heading_small%22%20data-stringify-type=%22bold%22%3ESENTIMENT%3C/strong%3E%3C/span%3E%3Cbr%20/%3E%3Cstrong%20data-stringify-type=%22bold%22%3E-100%20to%20+100%20Numerical%20Scale:%3C/strong%3E%3C/div%3E%0A%3Cul%20class=%22p-rich_text_list%20p-rich_text_list__bullet%20p-rich_text_list--nested%22%20data-stringify-type=%22unordered-list%22%20data-list-tree=%22true%22%20data-indent=%220%22%20data-border=%220%22%3E%0A%3Cli%20data-stringify-indent=%220%22%20data-stringify-border=%220%22%3E%3Cstrong%3E-100:%3C/strong%3E%20Extremely%20negative%20(panic,%20outrage,%20complete%20loss%20of%20confidence).%3C/li%3E%0A%3Cli%20data-stringify-indent=%220%22%20data-stringify-border=%220%22%3E%3Cstrong%3E0:%3C/strong%3E&nbsp;%20&nbsp;%20&nbsp;%20&nbsp;Neutral%20(objective%20reporting,%20no%20emotional%20tone).%3C/li%3E%0A%3Cli%20data-stringify-indent=%220%22%20data-stringify-border=%220%22%3E%3Cstrong%3E+100%3C/strong%3E:%20Extremely%20positive%20(complete%20confidence,%20optimistic%20expectations).%3C/li%3E%0A%3C/ul%3E"  theme="slds"  ></omnistudio-output-field>
+      </div><div data-style-id="state0element1block_element1" class="slds-col   slds-size_5-of-12  " data-rindex={rindex} style="" ><omnistudio-output-field data-style-id="state0element1block_element1_child"   card={card}  record={record}  merge-field="%3Cdiv%20class=%22p-rich_text_section%22%3E%3Cspan%20style=%22text-decoration:%20underline;%22%3E%3Cstrong%20class=%22slds-text-heading_small%22%20data-stringify-type=%22bold%22%3ERISK%20SCORE%3C/strong%3E%3C/span%3E%3Cbr%20/%3E%3Cstrong%20data-stringify-type=%22bold%22%3E1%20to%2025%20Numerical%20Scale:%3C/strong%3E%3C/div%3E%0A%3Cul%20class=%22p-rich_text_list%20p-rich_text_list__bullet%20p-rich_text_list--nested%22%20data-stringify-type=%22unordered-list%22%20data-list-tree=%22true%22%20data-indent=%220%22%20data-border=%220%22%3E%0A%3Cli%20data-stringify-indent=%220%22%20data-stringify-border=%220%22%3EImpact%20(%3Cstrong%3E1%20to%205%3C/strong%3E)%20*%20Likelihood%20(%3Cstrong%3E1%20to%205%3C/strong%3E)%20=%20%3Cstrong%3E1%20to%2025%3C/strong%3E%3C/li%3E%0A%3C/ul%3E"  theme="slds"  ></omnistudio-output-field>
+      </div>
+        </div></omnistudio-block>
+    </div>
+        </div>
+      </omnistudio-flex-card-state>
+                        </template>
+                      </template>
+                      <template if:false={hasRecords}>
+                            <omnistudio-flex-card-state  record={record} data-statue="false"  data-index="0" data-rindex={rindex} class="cf-vlocity-state-0 cf-vlocity-state slds-size_12-of-12"  tracking-obj={_childCardTrackingObj} >
+      <div if:true={cardLoaded} class="slds-grid slds-wrap slds-card slds-p-around_x-small slds-m-bottom_x-small" style="">
+          <div data-style-id="state0element0" class="slds-col  slds-text-align_center  slds-size_1-of-12  " data-rindex={rindex} style="      
+         " ><omnistudio-flex-icon data-style-id="state0element0_child"   card={card}  record={record}  icon-type="Salesforce SVG"  icon-name="action:info"  size="medium"  extraclass="slds-icon_container slds-icon-action-info slds-icon_container--circle"  variant="inverse"  imgsrc=""  theme="slds"  ></omnistudio-flex-icon>
+      </div><div data-style-id="state0element1" class="slds-col   slds-p-around_x-small slds-size_11-of-12  " data-rindex={rindex} style="" >
+    <omnistudio-block data-style-id="state0element1_child"  card={card}  record={record}  label="Scoring"  collapsible="true"  collapsed-by-default="false"  theme="slds"  ><div class="slds-grid slds-wrap">
+          <div data-style-id="state0element1block_element0" class="slds-col   slds-size_6-of-12  " data-rindex={rindex} style="" ><omnistudio-output-field data-style-id="state0element1block_element0_child"   card={card}  record={record}  merge-field="%3Cdiv%20class=%22p-rich_text_section%22%3E%3Cspan%20style=%22text-decoration:%20underline;%22%3E%3Cstrong%20class=%22slds-text-heading_small%22%20data-stringify-type=%22bold%22%3ESENTIMENT%3C/strong%3E%3C/span%3E%3Cbr%20/%3E%3Cstrong%20data-stringify-type=%22bold%22%3E-100%20to%20+100%20Numerical%20Scale:%3C/strong%3E%3C/div%3E%0A%3Cul%20class=%22p-rich_text_list%20p-rich_text_list__bullet%20p-rich_text_list--nested%22%20data-stringify-type=%22unordered-list%22%20data-list-tree=%22true%22%20data-indent=%220%22%20data-border=%220%22%3E%0A%3Cli%20data-stringify-indent=%220%22%20data-stringify-border=%220%22%3E%3Cstrong%3E-100:%3C/strong%3E%20Extremely%20negative%20(panic,%20outrage,%20complete%20loss%20of%20confidence).%3C/li%3E%0A%3Cli%20data-stringify-indent=%220%22%20data-stringify-border=%220%22%3E%3Cstrong%3E0:%3C/strong%3E&nbsp;%20&nbsp;%20&nbsp;%20&nbsp;Neutral%20(objective%20reporting,%20no%20emotional%20tone).%3C/li%3E%0A%3Cli%20data-stringify-indent=%220%22%20data-stringify-border=%220%22%3E%3Cstrong%3E+100%3C/strong%3E:%20Extremely%20positive%20(complete%20confidence,%20optimistic%20expectations).%3C/li%3E%0A%3C/ul%3E"  theme="slds"  ></omnistudio-output-field>
+      </div><div data-style-id="state0element1block_element1" class="slds-col   slds-size_5-of-12  " data-rindex={rindex} style="" ><omnistudio-output-field data-style-id="state0element1block_element1_child"   card={card}  record={record}  merge-field="%3Cdiv%20class=%22p-rich_text_section%22%3E%3Cspan%20style=%22text-decoration:%20underline;%22%3E%3Cstrong%20class=%22slds-text-heading_small%22%20data-stringify-type=%22bold%22%3ERISK%20SCORE%3C/strong%3E%3C/span%3E%3Cbr%20/%3E%3Cstrong%20data-stringify-type=%22bold%22%3E1%20to%2025%20Numerical%20Scale:%3C/strong%3E%3C/div%3E%0A%3Cul%20class=%22p-rich_text_list%20p-rich_text_list__bullet%20p-rich_text_list--nested%22%20data-stringify-type=%22unordered-list%22%20data-list-tree=%22true%22%20data-indent=%220%22%20data-border=%220%22%3E%0A%3Cli%20data-stringify-indent=%220%22%20data-stringify-border=%220%22%3EImpact%20(%3Cstrong%3E1%20to%205%3C/strong%3E)%20*%20Likelihood%20(%3Cstrong%3E1%20to%205%3C/strong%3E)%20=%20%3Cstrong%3E1%20to%2025%3C/strong%3E%3C/li%3E%0A%3C/ul%3E"  theme="slds"  ></omnistudio-output-field>
+      </div>
+        </div></omnistudio-block>
+    </div>
+        </div>
+      </omnistudio-flex-card-state>
+                      </template>
+            </template>
+            <template if:true={hasError}>
+            {error}
+            </template>
+            
+      <omnistudio-action action-wrapperclass="slds-hide" re-render-flyout class="action-trigger slds-col" onupdateos={updateOmniscript} onselectcards={updateSelectedCards} onsetvalue={updateAction} onfireactionevent={actionEvtHandler}>
+      
+      </omnistudio-action>
+  
+            <omnistudio-action class="execute-action" re-render-flyout action-wrapperclass="slds-hide" onupdateos={updateOmniscript} onselectcards={updateSelectedCards} onsetvalue={updateAction} onfireactionevent={actionEvtHandler}>
+            
+            </omnistudio-action>
+            </div>
+          </template>

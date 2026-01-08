@@ -222,6 +222,7 @@ def load_models():
 load_models()
 
 VEHICLE_CLASSES = {2, 3, 5, 7}
+PERSON_CLASS = 0
 
 
 def preprocess_for_yolo(image_bgr, input_size=640):
@@ -283,6 +284,50 @@ def detect_vehicles(image_bgr):
     output = ort_session.run(None, {input_name: blob})
     return postprocess_yolo(output[0], scale, pad_x, pad_y, h, w)
 
+
+
+def detect_persons(image_bgr):
+    """Detect persons using YOLOv8 (class 0) for fallback head blur"""
+    if ort_session is None:
+        return []
+    h, w = image_bgr.shape[:2]
+    blob, scale, pad_x, pad_y = preprocess_for_yolo(image_bgr)
+    input_name = ort_session.get_inputs()[0].name
+    output = ort_session.run(None, {input_name: blob})
+    
+    predictions = output[0].transpose()
+    boxes, scores = [], []
+    
+    for pred in predictions:
+        x_c, y_c, bw, bh = pred[:4]
+        class_scores = pred[4:]
+        class_id = np.argmax(class_scores)
+        confidence = class_scores[class_id]
+        
+        if confidence < 0.25 or class_id != PERSON_CLASS:
+            continue
+        
+        x1 = int((x_c - bw / 2 - pad_x) / scale)
+        y1 = int((y_c - bh / 2 - pad_y) / scale)
+        x2 = int((x_c + bw / 2 - pad_x) / scale)
+        y2 = int((y_c + bh / 2 - pad_y) / scale)
+        
+        x1, y1 = max(0, min(x1, w)), max(0, min(y1, h))
+        x2, y2 = max(0, min(x2, w)), max(0, min(y2, h))
+        
+        boxes.append([x1, y1, x2 - x1, y2 - y1])
+        scores.append(float(confidence))
+    
+    if not boxes:
+        return []
+    
+    indices = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.45)
+    results = []
+    for i in indices:
+        idx = i[0] if isinstance(i, (list, np.ndarray)) else i
+        x, y, bw, bh = boxes[idx]
+        results.append((x, y, x + bw, y + bh))
+    return results
 
 def detect_plates(image_bgr):
     if plate_session is None:
@@ -346,6 +391,28 @@ def detect_faces(image_rgb):
     return faces
 
 
+
+def get_head_regions(persons, faces, head_ratio=0.28):
+    """Get head regions for persons not already covered by face detection"""
+    head_regions = []
+    for (px1, py1, px2, py2) in persons:
+        head_h = int((py2 - py1) * head_ratio)
+        head_region = (px1, py1, px2, py1 + head_h)
+        
+        # Check if any face overlaps this head region
+        has_face = False
+        for (fx1, fy1, fx2, fy2) in faces:
+            face_cy = (fy1 + fy2) // 2
+            face_cx = (fx1 + fx2) // 2
+            if px1 <= face_cx <= px2 and py1 <= face_cy <= py1 + head_h:
+                has_face = True
+                break
+        
+        if not has_face:
+            head_regions.append(head_region)
+    
+    return head_regions
+
 def apply_blur(image_bgr, regions):
     for (x1, y1, x2, y2) in regions:
         if x2 > x1 and y2 > y1:
@@ -393,8 +460,10 @@ def redact():
         faces = detect_faces(image_rgb)
         plates = detect_plates(image_bgr)
         vehicles = detect_vehicles(image_bgr)
+        persons = detect_persons(image_bgr)
         
-        all_regions = faces + plates
+        fallback_heads = get_head_regions(persons, faces)
+        all_regions = faces + plates + fallback_heads
         if all_regions:
             image_bgr = apply_blur(image_bgr, all_regions)
         
@@ -413,7 +482,9 @@ def redact():
             "redactedBase64": redacted_b64,
             "facesBlurred": len(faces),
             "platesBlurred": len(plates),
-            "vehiclesDetected": len(vehicles)
+            "vehiclesDetected": len(vehicles),
+            "personsDetected": len(persons),
+            "fallbackHeadsBlurred": len(fallback_heads)
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -443,8 +514,9 @@ def chat():
             
             faces = detect_faces(image_rgb)
             plates = detect_plates(image_bgr)
-            
-            all_regions = faces + plates
+            persons = detect_persons(image_bgr)
+            fallback_heads = get_head_regions(persons, faces)
+            all_regions = faces + plates + fallback_heads
             if all_regions:
                 image_bgr = apply_blur(image_bgr, all_regions)
                 print(f'✓ Redacted {len(faces)} faces, {len(plates)} plates')

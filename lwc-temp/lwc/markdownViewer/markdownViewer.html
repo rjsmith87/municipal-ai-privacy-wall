@@ -1,0 +1,27 @@
+<template>
+    <lightning-card title="Generated Note" icon-name="standard:note">
+        <div class="slds-p-horizontal_small">
+            <template if:true={renderedHtml}>
+                <lightning-formatted-rich-text value={renderedHtml}></lightning-formatted-rich-text>
+            </template>
+
+            <template if:false={renderedHtml}>
+                <template if:false={error}>
+                    <p>No content available in Generated Note.</p>
+                </template>
+            </template>
+
+             <template if:true={isLoading}>
+                <div class="slds-is-relative slds-m-vertical_large">
+                    <lightning-spinner alternative-text="Loading..." size="medium"></lightning-spinner>
+                </div>
+            </template>
+
+            <template if:true={error}>
+                <div class="slds-text-color_error">
+                    <p>Error loading note content: {error}</p>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>
