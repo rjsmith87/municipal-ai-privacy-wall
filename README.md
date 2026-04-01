@@ -100,7 +100,7 @@ The AI agent is grounded in real municipal logic through a multi-step ETL pipeli
 ## Repository Structure
 
 ```
-toronto-blur-redactor/
+municipal-ai-privacy-wall/
 ├── app.py                  # Flask app — redaction pipeline + Salesforce integration
 ├── requirements.txt        # Python dependencies
 ├── Procfile                # Heroku process definition
