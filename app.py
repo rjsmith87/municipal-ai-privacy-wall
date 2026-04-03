@@ -582,19 +582,6 @@ def chat():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route("/api/test-auth", methods=["GET"])
-def test_auth():
-    """Test JWT authentication."""
-    try:
-        token, instance_url = get_sf_access_token()
-        return jsonify({
-            'success': True,
-            'instance_url': instance_url,
-            'token_preview': token[:20] + '...'
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
