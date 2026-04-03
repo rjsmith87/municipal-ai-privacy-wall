@@ -7,10 +7,14 @@ Auth: JWT Bearer Flow
 
 import base64
 import hmac
+import logging
 import os
 import re
 import time
 from io import BytesIO
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+logger = logging.getLogger(__name__)
 
 import cv2
 import jwt
@@ -84,7 +88,7 @@ def get_sf_access_token():
         'expires_at': time.time() + 7200
     }
     
-    print(f"✓ Got new Salesforce token")
+    logger.info("Got new Salesforce token")
     return _sf_token_cache['token'], _sf_token_cache['instance_url']
 
 
@@ -107,11 +111,11 @@ def upload_image_to_salesforce(image_base64, filename="311_photo.jpg"):
     resp = requests.post(url, headers=headers, json=payload)
     
     if resp.status_code not in [200, 201]:
-        print(f"ContentVersion upload failed: {resp.text}")
+        logger.error("ContentVersion upload failed: %s", resp.text)
         return None
     
     content_version_id = resp.json().get('id')
-    print(f"✓ Created ContentVersion: {content_version_id}")
+    logger.info("Created ContentVersion: %s", content_version_id)
     
     query_url = f"{instance_url}/services/data/{os.environ.get('SF_API_VERSION', '62.0')}/query"
     query = f"SELECT ContentDocumentId FROM ContentVersion WHERE Id = '{content_version_id}'"
@@ -120,7 +124,7 @@ def upload_image_to_salesforce(image_base64, filename="311_photo.jpg"):
     
     if resp.status_code == 200 and resp.json().get('records'):
         content_doc_id = resp.json()['records'][0]['ContentDocumentId']
-        print(f"✓ ContentDocumentId: {content_doc_id}")
+        logger.info("ContentDocumentId: %s", content_doc_id)
         return content_doc_id
     
     return None
@@ -142,19 +146,19 @@ def invoke_analyze_photo_flow(content_doc_id):
         }]
     }
     
-    print(f'🔍 Calling Analyze 311 Photo Flow for {content_doc_id}...')
+    logger.info("Calling Analyze 311 Photo Flow for %s", content_doc_id)
     resp = requests.post(url, headers=headers, json=payload, timeout=60)
     
     if resp.status_code == 200:
         result = resp.json()
         if result and len(result) > 0 and 'outputValues' in result[0]:
             analysis = result[0]['outputValues'].get('AnalysisResult', '')
-            print(f'✓ Flow returned analysis')
+            logger.info("Flow returned analysis")
             return analysis
-        print(f'⚠ Flow returned unexpected format: {result}')
+        logger.warning("Flow returned unexpected format: %s", result)
         return None
     
-    print(f'⚠ Flow call failed: {resp.status_code} - {resp.text}')
+    logger.error("Flow call failed: %s - %s", resp.status_code, resp.text)
     return None
 
 
@@ -182,14 +186,14 @@ def invoke_create_case_flow(case_data):
         }]
     }
     
-    print(f'📋 Creating 311 case: {case_data.get("subject")}')
+    logger.info("Creating 311 case: %s", case_data.get("subject"))
     resp = requests.post(url, headers=headers, json=payload, timeout=30)
     
     if resp.status_code == 200:
         result = resp.json()
         if result and len(result) > 0 and 'outputValues' in result[0]:
             output = result[0]['outputValues']
-            print(f'✓ Case created: {output.get("caseNumber")}')
+            logger.info("Case created: %s", output.get("caseNumber"))
             return {
                 'success': output.get('success', False),
                 'caseNumber': output.get('caseNumber'),
@@ -197,7 +201,7 @@ def invoke_create_case_flow(case_data):
                 'message': output.get('message')
             }
     
-    print(f'⚠ Case creation failed: {resp.status_code} - {resp.text}')
+    logger.error("Case creation failed: %s - %s", resp.status_code, resp.text)
     return {'success': False, 'message': f'Flow error: {resp.text}'}
 
 
@@ -231,15 +235,15 @@ def load_models():
     global ort_session, plate_session
     if os.path.exists(MODEL_PATH):
         ort_session = ort.InferenceSession(MODEL_PATH, providers=["CPUExecutionProvider"])
-        print(f"✓ YOLOv8 vehicle model loaded")
+        logger.info("YOLOv8 vehicle model loaded")
     else:
-        print(f"⚠ Vehicle model not found at {MODEL_PATH}")
+        logger.warning("Vehicle model not found at %s", MODEL_PATH)
     
     if os.path.exists(PLATE_MODEL_PATH):
         plate_session = ort.InferenceSession(PLATE_MODEL_PATH, providers=["CPUExecutionProvider"])
-        print(f"✓ License plate model loaded")
+        logger.info("License plate model loaded")
     else:
-        print(f"⚠ Plate model not found at {PLATE_MODEL_PATH}")
+        logger.warning("Plate model not found at %s", PLATE_MODEL_PATH)
 
 load_models()
 
@@ -526,7 +530,7 @@ def chat():
         
         # If image provided, redact and upload to Salesforce
         if image_base64:
-            print('📷 Processing image...')
+            logger.info("Processing image...")
             
             image_data = base64.b64decode(image_base64)
             pil_image = Image.open(BytesIO(image_data))
@@ -542,7 +546,7 @@ def chat():
             all_regions = faces + plates + fallback_heads
             if all_regions:
                 image_bgr = apply_blur(image_bgr, all_regions)
-                print(f'✓ Redacted {len(faces)} faces, {len(plates)} plates, {len(fallback_heads)} fallback heads')
+                logger.info("Redacted %d faces, %d plates, %d fallback heads", len(faces), len(plates), len(fallback_heads))
             
             _, buffer = cv2.imencode(".jpg", image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 90])
             redacted_b64 = base64.b64encode(buffer).decode("utf-8")
@@ -552,12 +556,12 @@ def chat():
                 analysis = invoke_analyze_photo_flow(content_doc_id)
                 if analysis:
                     message = f"{message}\n\n[Photo Analysis Result]\n{analysis}\n\nContentDocumentId: {content_doc_id}"
-                    print('✓ Image analyzed, added to message context')
+                    logger.info("Image analyzed, added to message context")
                 else:
                     message = f"{message}\n\n[Photo uploaded but analysis failed. ContentDocumentId: {content_doc_id}]"
-                    print('⚠ Image uploaded but flow analysis failed')
+                    logger.warning("Image uploaded but flow analysis failed")
             else:
-                print('⚠ Image upload failed, continuing without image')
+                logger.warning("Image upload failed, continuing without image")
         
         # Send to Austin
         url = f"{instance_url}/services/apexrest/austin"
@@ -583,7 +587,7 @@ def chat():
             case_data = parse_create_case_block(austin_reply)
             
             if case_data:
-                print('🔍 Detected CREATE_CASE block, invoking Flow...')
+                logger.info("Detected CREATE_CASE block, invoking Flow...")
                 case_result = invoke_create_case_flow(case_data)
                 
                 if case_result.get('success'):
